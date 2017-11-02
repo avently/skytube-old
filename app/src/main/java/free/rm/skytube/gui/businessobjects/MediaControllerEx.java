@@ -71,6 +71,19 @@ public class MediaControllerEx extends MediaController {
 		hideController = true;
 	}
 
+	/**
+	 * Gets video total duration for swipe controls.
+	 */
+	public int getTotalDuration() {
+		return this.videoView.getDuration();
+	}
+
+    /**
+     * Gets video current position for swipe controls.
+     */
+    public int getCurrentPosition() {
+        return this.videoView.getCurrentPosition();
+    }
 
 	@Override
 	public boolean dispatchKeyEvent(KeyEvent event) {

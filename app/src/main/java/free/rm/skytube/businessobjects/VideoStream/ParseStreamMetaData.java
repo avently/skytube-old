@@ -94,6 +94,31 @@ public class ParseStreamMetaData {
 		return list;
 	}
 
+    public StreamInfo getStreamInfo() {
+        StreamInfo streamInfo;
+        try {
+            StreamingService youtube = NewPipe.getService("Youtube");
+            StreamExtractor  extractor = youtube.getExtractorInstance(youtubeVideoUrl);
+
+            // actual extraction
+            streamInfo = StreamInfo.getVideoInfo(extractor);
+
+            // if non critical exceptions happened during extraction they will be printed now
+            for(Throwable error : streamInfo.errors) {
+                System.err.println("----------------");
+                error.printStackTrace();
+            }
+
+        } catch (StreamExtractor.ContentNotAvailableException exception) {
+            streamInfo = new StreamInfo(); //FIXME
+        } catch (Throwable tr) {
+            Log.e(TAG, "An error has occurred while getting streams metadata.  URL=" + this.youtubeVideoUrl, tr);
+            streamInfo = new StreamInfo(); //FIXME
+        }
+
+        return streamInfo;
+    }
+
 
 
 	/**

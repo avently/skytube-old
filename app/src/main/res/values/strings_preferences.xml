@@ -450,6 +450,8 @@
 		<item>sensor</item>
 	</string-array>
 
+	<string name="pref_key_brightness_level" translatable="false">pref_key_brightness_level</string>
+
 	<string name="pref_youtube_api_key">pref_youtube_api_key</string>
 	<string name="pref_title_youtube_api_key">YouTube API Key</string>
 	<string name="pref_summary_youtube_api_key">Enter your own YouTube Data API Key.  Leave blank to use the default one.</string>
@@ -457,4 +459,16 @@
 	<string name="pref_youtube_api_key_custom">Key is valid.  Restart app to use the new YouTube API key.</string>
 	<string name="pref_youtube_api_key_default">Restart app to switch back to default YouTube API key.</string>
 	<string name="restart">Restart</string>
+
+	<string name="default_audio_format_key" translatable="false">default_audio_format</string>
+	<string name="default_audio_format_value" translatable="false">m4a</string>
+	<string name="default_popup_resolution_key" translatable="false">default_popup_resolution_key</string>
+	<string name="default_popup_resolution_value" translatable="false">360p</string>
+	<string name="preferred_video_format_key" translatable="false">preferred_video_format</string>
+	<string name="preferred_video_format_default" translatable="false">MPEG-4</string>
+	<string name="default_resolution_key" translatable="false">default_resolution_preference</string>
+	<string name="default_resolution_value" translatable="false">360p</string>
+	<string name="show_higher_resolutions_key" translatable="false">show_higher_resolutions_key</string>
+	<string name="resume_on_audio_focus_gain_key" translatable="false">resume_on_audio_focus_gain</string>
+
 </resources>

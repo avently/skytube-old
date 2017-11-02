@@ -56,6 +56,8 @@ dependencies {
     compile group: 'org.ocpsoft.prettytime', name: 'prettytime', version: '3.2.7.Final'
     compile 'com.google.http-client:google-http-client-android:1.22.0'
     compile 'com.google.apis:google-api-services-youtube:v3-rev181-1.22.0'
+    compile 'com.google.android.exoplayer:exoplayer:r2.4.3'
+    compile 'com.nostra13.universalimageloader:universal-image-loader:1.9.5'
 
     // libextractor
     compile 'org.jsoup:jsoup:1.8.3'

@@ -19,13 +19,6 @@
 		android:padding="17dp"
 		style="@style/LoadingProgressBar"/>
 
-	<!-- A view that will display/hides the HUD -->
-	<View android:id="@+id/void_view"
-			   android:layout_width="match_parent"
-			   android:layout_height="match_parent"
-			   android:layout_gravity="center"
-			   android:focusable="false"/>
-
 	<!--
 		VIDEO DESCRIPTION / INFO
 	-->

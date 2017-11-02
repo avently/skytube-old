@@ -6,4 +6,12 @@
 	<dimen name="comments_drawer_width">300dp</dimen>
 
 	<dimen name="video_grid_progress_bar_top_margin">50dp</dimen>
+
+    <!-- configuration for gesture controller indicator. -->
+    <dimen name="controller_indicator_width">80dp</dimen>
+    <dimen name="controller_indicator_height">90dp</dimen>
+    <dimen name="controller_indicator_padding_v">15dp</dimen>
+    <dimen name="controller_indicator_padding_h">10dp</dimen>
+    <dimen name="controller_indicator_icon_size">36dp</dimen>
+    <dimen name="controller_indicator_text_size">16sp</dimen>
 </resources>

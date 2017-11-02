@@ -6,6 +6,7 @@
 
 	<string name="error_video_play">Błąd odtwarzania</string>
 	<string name="error_video_streams_empty">Wideo %s nie ma strumieni</string>
+	<string name="error_video_streams_video_not_available">This user blocked the video for viewers from your country. Sorry.</string>
 	<string name="error_video_streams">Wystąpił błąd podczas otrzymywania strumienia wideo.</string>
 	<string name="error_get_video_desc">Wystąpił błąd podczas otrzymywania opisu wideo.</string>
 	<string name="error_invalid_url">Niepoprawny adres URL wideo:  %s</string>

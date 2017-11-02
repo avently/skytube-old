@@ -1,19 +1,15 @@
 package free.rm.skytube.gui.fragments;
 
-import android.content.DialogInterface;
-import android.content.Intent;
+import android.content.*;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
+import android.preference.PreferenceManager;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewGroup;
+import android.view.*;
 import android.widget.ExpandableListView;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -22,6 +18,12 @@ import android.widget.Toast;
 import android.widget.VideoView;
 
 import com.bumptech.glide.Glide;
+
+import free.rm.skytube.util.ControllerOverlay;
+import free.rm.skytube.util.GestureControllerOverlay;
+import org.schabi.newpipe.extractor.stream_info.AudioStream;
+import org.schabi.newpipe.extractor.stream_info.StreamInfo;
+import org.schabi.newpipe.extractor.stream_info.VideoStream;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -45,28 +47,33 @@ import free.rm.skytube.gui.businessobjects.CommentsAdapter;
 import free.rm.skytube.gui.businessobjects.FragmentEx;
 import free.rm.skytube.gui.businessobjects.MediaControllerEx;
 import free.rm.skytube.gui.businessobjects.SubscribeButton;
+import free.rm.skytube.player.BackgroundPlayer;
+import free.rm.skytube.player.BasePlayer;
+import free.rm.skytube.util.Utils;
 import hollowsoft.slidingdrawer.OnDrawerOpenListener;
 import hollowsoft.slidingdrawer.SlidingDrawer;
 
 /**
  * A fragment that holds a standalone YouTube player.
  */
-public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnPreparedListener {
+public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnPreparedListener, ControllerOverlay.Listener {
 
 	public static final String YOUTUBE_VIDEO_OBJ = "YouTubePlayerFragment.yt_video_obj";
-
-	private YouTubeVideo		youTubeVideo = null;
-	private YouTubeChannel		youTubeChannel = null;
+	public static final String 			INFO_KEY = "info_key";
+	public static final String 			YOUTUBE_VIDEO_KEY = "youtube_video_key";
+	private YouTubeVideo			youTubeVideo = null;
+	private YouTubeChannel			youTubeChannel = null;
 
 	private VideoView			videoView = null;
 	/** The current video position (i.e. play time). */
-	private int					videoCurrentPosition = 0;
+	private int          videoCurrentPosition = 0;
 	private MediaControllerEx	mediaController = null;
+    private GestureControllerOverlay mGestureController = null;
 
 	private TextView			videoDescTitleTextView = null;
 	private ImageView			videoDescChannelThumbnailImageView = null;
 	private TextView			videoDescChannelTextView = null;
-	private SubscribeButton		videoDescSubscribeButton = null;
+	private SubscribeButton			videoDescSubscribeButton = null;
 	private TextView			videoDescViewsTextView = null;
 	private ProgressBar			videoDescLikesBar = null;
 	private TextView			videoDescLikesTextView = null;
@@ -74,19 +81,22 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 	private View                videoDescRatingsDisabledTextView = null;
 	private TextView			videoDescPublishDateTextView = null;
 	private TextView			videoDescriptionTextView = null;
-	private View				voidView = null;
 	private View				loadingVideoView = null;
 
 	private SlidingDrawer		videoDescriptionDrawer = null;
 	private SlidingDrawer		commentsDrawer = null;
 	private View				commentsProgressBar = null,
-								noVideoCommentsView = null;
+                noVideoCommentsView = null;
 	private CommentsAdapter		commentsAdapter = null;
-	private ExpandableListView	commentsExpandableListView = null;
+	private ExpandableListView		commentsExpandableListView = null;
 
-	private Menu                menu = null;
+	private Menu		            menu = null;
 
 	private Handler				timerHandler = null;
+
+	private StreamInfo 			currentStreamInfo = null;
+	private BackgroundPlayer    mBackgroundPlayerService;
+	private Boolean 			mIsBound = false;
 
 	/** Timeout (in milliseconds) before the HUD (i.e. media controller + action/title bar) is hidden */
 	private static final int HUD_VISIBILITY_TIMEOUT = 5000;
@@ -102,8 +112,11 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 		// indicate that this fragment has an action bar menu
 		setHasOptionsMenu(true);
 
-		if (savedInstanceState != null)
-			videoCurrentPosition = savedInstanceState.getInt(VIDEO_CURRENT_POSITION, 0);
+		if (savedInstanceState != null) {
+		    videoCurrentPosition = savedInstanceState.getInt(VIDEO_CURRENT_POSITION, 0);
+		    youTubeVideo = (YouTubeVideo) savedInstanceState.getSerializable(YOUTUBE_VIDEO_KEY);
+		    currentStreamInfo = (StreamInfo) savedInstanceState.getSerializable(INFO_KEY);
+		}
 
 		if (youTubeVideo == null) {
 			loadingVideoView = view.findViewById(R.id.loadingVideoView);
@@ -115,8 +128,11 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 			// setup the media controller (will control the video playing/pausing)
 			mediaController = new MediaControllerEx(getActivity(), videoView);
 
-			voidView = view.findViewById(R.id.void_view);
-			voidView.setOnClickListener(new View.OnClickListener() {
+            mGestureController = new GestureControllerOverlay(getActivity(), mediaController);
+            ((ViewGroup)view.getRootView()).addView(mGestureController.getView(),2);
+            mGestureController.setListener(this);
+
+            mGestureController.getView().setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
 					showOrHideHud();
@@ -130,6 +146,7 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 				@Override
 				public void onClick(View v) {
 					if (youTubeChannel != null) {
+						videoView.pause();
 						Intent i = new Intent(getActivity(), FragmentHolderActivity.class);
 						i.putExtra(FragmentHolderActivity.FRAGMENT_HOLDER_CHANNEL_BROWSER, true);
 						i.putExtra(ChannelBrowserFragment.CHANNEL_OBJ, youTubeChannel);
@@ -188,11 +205,48 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 	}
 
 
-	@Override
-	public void onSaveInstanceState(Bundle outState) {
-		super.onSaveInstanceState(outState);
-		outState.putInt(VIDEO_CURRENT_POSITION, videoCurrentPosition);
-	}
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(VIDEO_CURRENT_POSITION, videoCurrentPosition);
+        outState.putSerializable(YOUTUBE_VIDEO_KEY, youTubeVideo);
+
+        if (videoView != null && videoView.isPlaying()) {
+            outState.putSerializable(INFO_KEY, currentStreamInfo);
+        }
+    }
+
+
+    private ServiceConnection mConnection = new ServiceConnection() {
+        public void onServiceConnected(ComponentName className, IBinder service) {
+            mBackgroundPlayerService = ((BackgroundPlayer.LocalBinder)service).getService();
+        }
+
+        public void onServiceDisconnected(ComponentName className) {
+            mBackgroundPlayerService = null;
+        }
+    };
+
+
+    void doBindService() {
+        getContext().bindService(new Intent(getContext(),
+                BackgroundPlayer.class), mConnection, Context.BIND_AUTO_CREATE);
+        mIsBound = true;
+    }
+
+    void doUnbindService() {
+        if (mIsBound) {
+            mBackgroundPlayerService.stopService(new Intent(getContext(), BackgroundPlayer.class));
+            getContext().unbindService(mConnection);
+            mIsBound = false;
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        doUnbindService();
+    }
 
 
 	/**
@@ -233,8 +287,6 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 		loadVideo();
 	}
 
-
-
 	@Override
 	public void onPrepared(MediaPlayer mediaPlayer) {
 		loadingVideoView.setVisibility(View.GONE);
@@ -243,20 +295,88 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 		showHud();
 	}
 
-
-
 	@Override
 	public void onPause() {
-		if (videoView != null && videoView.isPlaying()) {
-			videoCurrentPosition = videoView.getCurrentPosition();
-		}
-
 		super.onPause();
+
+		startBackgroundPlaybackAfterPause();
+        saveCurrentBrightness();
 	}
 
+	@Override
+	public void onResume() {
+        super.onResume();
 
+        stopBackgroundPlaybackAfterResume();
+        setupUserPrefs();
+    }
 
-	/**
+    private void startBackgroundPlaybackAfterPause() {
+        if (videoView == null)
+            return;
+
+        videoCurrentPosition = videoView.getCurrentPosition();
+
+        if(!videoView.isPlaying())
+            return;
+
+        videoView.pause();
+        currentStreamInfo = youTubeVideo.getStreamInfo();
+        if (currentStreamInfo == null || currentStreamInfo.audio_streams == null || currentStreamInfo.audio_streams.isEmpty())
+            return;
+
+        List<AudioStream> audioStreams = currentStreamInfo.audio_streams;
+
+        AudioStream audioStream = audioStreams.get(Utils.getPreferredAudioFormat(getActivity(), audioStreams));
+        Intent mIntent = new Intent(getContext(), BackgroundPlayer.class)
+                .putExtra(BasePlayer.VIDEO_TITLE, youTubeVideo.getTitle())
+                .putExtra(BasePlayer.VIDEO_URL, youTubeVideo.getVideoUrl())
+                .putExtra(BasePlayer.VIDEO_THUMBNAIL_URL, youTubeVideo.getThumbnailUrl())
+                .putExtra(BasePlayer.CHANNEL_NAME, youTubeVideo.getChannelName())
+                .putExtra(BackgroundPlayer.AUDIO_STREAM, audioStream)
+                .putExtra(BasePlayer.START_POSITION, videoCurrentPosition);
+        getActivity().startService(mIntent);
+        doBindService();
+    }
+
+    private void stopBackgroundPlaybackAfterResume() {
+        if(!mIsBound)
+            return;
+
+        videoCurrentPosition = (int) mBackgroundPlayerService.getCurrentPosition() + 1000;
+        videoView.seekTo(videoCurrentPosition);
+        doUnbindService();
+        videoView.start();
+    }
+
+    // We can also add volume level or something in the future.
+    private void setupUserPrefs() {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        float brightnessLevel = sp.getFloat(getString(R.string.pref_key_brightness_level), 0.5f);
+        setBrightness(brightnessLevel);
+    }
+
+    private void saveCurrentBrightness() {
+        WindowManager.LayoutParams lp = getActivity().getWindow().getAttributes();
+        float brightnessLevel = lp.screenBrightness;
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        sp.edit().putFloat(getString(R.string.pref_key_brightness_level), brightnessLevel).apply();
+    }
+
+    private void setBrightness(float level) {
+        if(level <= 0.0f && level > 1.0f) return;
+
+	    WindowManager.LayoutParams lp = getActivity().getWindow().getAttributes();
+        lp.screenBrightness = level;
+        getActivity().getWindow().setAttributes(lp);
+    }
+
+	public void onBackPressed() {
+		if(videoView != null )
+			videoView.pause();
+	}
+
+    /**
 	 * @return True if the HUD is visible (provided that this Fragment is also visible).
 	 */
 	private boolean isHudVisible() {
@@ -418,7 +538,94 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 		}
 	}
 
+    // Below are notifications from ControllerOverlay
+    @Override
+    public void onPlayPause() {
+        if (videoView.isPlaying()) {
+            onPauseVideo();
+        } else {
+            onPlayVideo();
+        }
+    }
 
+    private void onPlayVideo() {
+        /*boolean result = playVideo();
+        if (result) {
+            //set view disabled(play/pause asynchronous processing)
+            mController.setViewEnabled(true);
+            if (mControllerRewindAndForwardExt != null) {
+                mControllerRewindAndForwardExt.showControllerButtonsView(mPlayerExt
+                        .canStop(), false, false);
+            }
+        }*/
+        videoView.start();
+    }
+
+    private void onPauseVideo() {
+        if (videoView != null && videoView.canPause()) {
+            videoView.pause();
+            /*set view disabled(play/pause asynchronous processing)
+            mediaController.setViewEnabled(true);
+            if (mControllerRewindAndForwardExt != null) {
+                mControllerRewindAndForwardExt.showControllerButtonsView(mPlayerExt
+                        .canStop(), false, false);
+            }*/
+        }
+    }
+
+    @Override
+    public void onSeekStart() {
+        videoView.pause();
+    }
+
+    @Override
+    public void onSeekMove(int time) {
+        if (videoView.canSeekBackward() && videoView.canSeekForward())
+            videoView.seekTo(time);
+    }
+
+    @Override
+    public void onSeekEnd(int time, int start, int end) {
+        if (videoView.canSeekBackward() && videoView.canSeekForward())
+            videoView.seekTo(time);
+        videoView.start();
+
+    }
+
+    @Override
+    public void onShown() {
+        /*addBackground();
+        mShowing = true;
+        setProgress();
+        showSystemUi(true);*/
+    }
+
+    @Override
+    public void onHidden() {
+        /*mShowing = false;
+        showSystemUi(false);*/
+    }
+
+    public boolean onIsRTSP() {
+        return true;
+    }
+
+
+    @Override
+    public void onReplay() {
+        /*
+        mTState = TState.PLAYING;
+        mFirstBePlayed = true;
+        if (mRetryExt.handleOnReplay()) {
+            return;
+        }
+        doStartVideo(false, 0, 0);*/
+    }
+
+    @Override
+    public void onClicked() {
+        showOrHideHud();
+    }
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -426,7 +633,7 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 	 * Given a YouTubeVideo, it will asynchronously get a list of streams (supplied by YouTube) and
 	 * then it asks the videoView to start playing a stream.
 	 */
-	private class GetStreamTask extends AsyncTaskParallel<Void, Exception, StreamMetaDataList> {
+	private class GetStreamTask extends AsyncTaskParallel<Void, Exception, StreamInfo> {
 
 		/** YouTube Video */
 		private YouTubeVideo	youTubeVideo;
@@ -465,23 +672,26 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 
 
 		@Override
-		protected StreamMetaDataList doInBackground(Void... param) {
-			return youTubeVideo.getVideoStreamList();
+		protected StreamInfo doInBackground(Void... param) {
+			return youTubeVideo.getStreamInfo();
 		}
 
 
 		@Override
-		protected void onPostExecute(StreamMetaDataList streamMetaDataList) {
+		protected void onPostExecute(StreamInfo streamInfo) {
 			String errorMessage = null;
 
-			if (streamMetaDataList.getErrorMessage() != null) {
-				// if the stream list is null, then it means an error has occurred
-				errorMessage = streamMetaDataList.getErrorMessage();
-			} else if (streamMetaDataList.size() <= 0) {
+			if(streamInfo == null || streamInfo.video_streams == null) {
+				errorMessage = getActivity().getString(R.string.error_video_streams_video_not_available);
+			}
+			else if(streamInfo.video_streams.isEmpty()) {
 				// if steam list if empty, then it means something went wrong...
 				errorMessage = String.format(getActivity().getString(R.string.error_video_streams_empty), youTubeVideo.getId());
 			} else {
-				Log.i(TAG, streamMetaDataList.toString());
+                StreamMetaDataList streamMetaDataList = new StreamMetaDataList();
+                for(VideoStream stream : streamInfo.video_streams) {
+                    streamMetaDataList.add( new StreamMetaData(stream) );
+                }
 
 				// get the desired stream based on user preferences
 				StreamMetaData desiredStream = streamMetaDataList.getDesiredStream();

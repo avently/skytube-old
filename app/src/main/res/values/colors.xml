@@ -37,6 +37,10 @@
 
 	<color name="video_desc_like_bar">@color/skytube_theme_colour</color>
 
+	<color name="background_notification_color">#323232</color>
+	<color name="middle_gray">#E0E0E0</color>
+	<color name="gray">#616161</color>
+
 	<!-- Comments -->
 	<color name="comment_background">@color/video_player_hud</color>
 	<color name="comment_text">#b3b3b3</color>

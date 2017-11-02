@@ -29,6 +29,8 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.youtube.model.Thumbnail;
 import com.google.api.services.youtube.model.Video;
 
+import org.schabi.newpipe.extractor.stream_info.StreamInfo;
+
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -42,7 +44,6 @@ import java.util.regex.Pattern;
 
 import free.rm.skytube.R;
 import free.rm.skytube.businessobjects.VideoStream.ParseStreamMetaData;
-import free.rm.skytube.businessobjects.VideoStream.StreamMetaDataList;
 import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.db.BookmarksDb;
 
@@ -81,6 +82,8 @@ public class YouTubeVideo implements Serializable {
 	private String	description;
 	/** Set to true if the video is a current live stream. */
 	private boolean isLiveStream;
+    /** Stream information. */
+    private StreamInfo	streamInfo;
 
 	/** Default preferred language(s) -- by default, no language shall be filtered out. */
 	private static final Set<String> defaultPrefLanguages = new HashSet<>(SkyTubeApp.getStringArrayAsList(R.array.languages_iso639_codes));
@@ -132,21 +135,14 @@ public class YouTubeVideo implements Serializable {
 	}
 
 
+    	public StreamInfo getStreamInfo() {
+   	     	if(this.streamInfo == null){
+   	         	ParseStreamMetaData streamParser = new ParseStreamMetaData(id);
+   	         	this.streamInfo = streamParser.getStreamInfo();
+   	     	}
 
-	/**
-	 * Returns a list of video/stream meta-data that is supported by this app (with respect to this
-	 * video).
-	 *
-	 * @return A list of {@link StreamMetaDataList}.
-	 */
-	public StreamMetaDataList getVideoStreamList() {
-		StreamMetaDataList streamMetaDataList;
-
-		ParseStreamMetaData streamParser = new ParseStreamMetaData(id);
-		streamMetaDataList = streamParser.getStreamMetaDataList();
-
-		return streamMetaDataList;
-	}
+    	    	return this.streamInfo;
+    	}
 
 
 
@@ -367,7 +363,11 @@ public class YouTubeVideo implements Serializable {
 	}
 
 	public void bookmarkVideo(Context context, Menu menu) {
+		StreamInfo savedStreamInfo = this.streamInfo;
+		this.streamInfo = null;
+
 		boolean successBookmark = BookmarksDb.getBookmarksDb().add(this);
+
 		Toast.makeText(context,
 						successBookmark  ?  R.string.video_bookmarked  :  R.string.video_bookmarked_error,
 						Toast.LENGTH_LONG).show();
@@ -376,9 +376,13 @@ public class YouTubeVideo implements Serializable {
 			menu.findItem(R.id.bookmark_video).setVisible(false);
 			menu.findItem(R.id.unbookmark_video).setVisible(true);
 		}
+		this.streamInfo = savedStreamInfo;
 	}
 
 	public void unbookmarkVideo(Context context, Menu menu) {
+		StreamInfo savedStreamInfo = this.streamInfo;
+		this.streamInfo = null;
+
 		boolean successUnbookmark = BookmarksDb.getBookmarksDb().remove(this);
 		Toast.makeText(context,
 						successUnbookmark  ?  R.string.video_unbookmarked  :  R.string.video_unbookmarked_error,
@@ -388,6 +392,7 @@ public class YouTubeVideo implements Serializable {
 			menu.findItem(R.id.bookmark_video).setVisible(true);
 			menu.findItem(R.id.unbookmark_video).setVisible(false);
 		}
+		this.streamInfo = savedStreamInfo;
 	}
 
 	public void shareVideo(Context context) {
