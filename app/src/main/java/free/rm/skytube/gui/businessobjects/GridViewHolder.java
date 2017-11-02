@@ -18,6 +18,8 @@
 package free.rm.skytube.gui.businessobjects;
 
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.support.v7.widget.PopupMenu;
 import android.support.v7.widget.RecyclerView;
 import android.view.Menu;
@@ -28,11 +30,10 @@ import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
 
-import butterknife.Bind;
+import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 import free.rm.skytube.R;
-import free.rm.skytube.businessobjects.MainActivityListener;
 import free.rm.skytube.businessobjects.YouTubeVideo;
 
 /**
@@ -44,21 +45,21 @@ public class GridViewHolder extends RecyclerView.ViewHolder {
 	private Context context = null;
 	private MainActivityListener listener;
 
-	@Bind(R.id.channel_layout)
+	@BindView(R.id.channel_layout)
 	View channelLayout;
- 	@Bind(R.id.title_text_view)
+ 	@BindView(R.id.title_text_view)
 	TextView titleTextView;
- 	@Bind(R.id.channel_text_view)
+ 	@BindView(R.id.channel_text_view)
  	TextView channelTextView;
- 	@Bind(R.id.thumbs_up_text_view)
+ 	@BindView(R.id.thumbs_up_text_view)
  	TextView thumbsUpPercentageTextView;
- 	@Bind(R.id.video_duration_text_view)
+ 	@BindView(R.id.video_duration_text_view)
  	TextView videoDurationTextView;
- 	@Bind(R.id.publish_date_text_view)
+ 	@BindView(R.id.publish_date_text_view)
  	TextView publishDateTextView;
- 	@Bind(R.id.thumbnail_image_view)
+ 	@BindView(R.id.thumbnail_image_view)
  	ImageView thumbnailImageView;
- 	@Bind(R.id.views_text_view)
+ 	@BindView(R.id.views_text_view)
  	TextView viewsTextView;
 
 
@@ -153,6 +154,10 @@ public class GridViewHolder extends RecyclerView.ViewHolder {
 			@Override
 			public boolean onMenuItemClick(MenuItem item) {
 				switch(item.getItemId()) {
+					case R.id.menu_open_video_with:
+						Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(youTubeVideo.getVideoUrl()));
+						context.startActivity(browserIntent);
+						return true;
 					case R.id.share:
 						youTubeVideo.shareVideo(view.getContext());
 						return true;

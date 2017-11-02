@@ -35,10 +35,10 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 
-import butterknife.Bind;
+import butterknife.BindView;
 import butterknife.ButterKnife;
 import free.rm.skytube.R;
-import free.rm.skytube.businessobjects.MainActivityListener;
+import free.rm.skytube.gui.businessobjects.MainActivityListener;
 import free.rm.skytube.businessobjects.YouTubeChannel;
 import free.rm.skytube.gui.businessobjects.YouTubePlayer;
 import free.rm.skytube.gui.businessobjects.updates.UpdatesCheckerTask;
@@ -50,17 +50,21 @@ import free.rm.skytube.gui.fragments.SearchVideoGridFragment;
  * Main activity (launcher).  This activity holds {@link free.rm.skytube.gui.fragments.VideosGridFragment}.
  */
 public class MainActivity extends AppCompatActivity implements MainActivityListener {
-	@Bind(R.id.fragment_container)
+	@BindView(R.id.fragment_container)
 	protected FrameLayout fragmentContainer;
 
 	private MainFragment mainFragment;
 	private SearchVideoGridFragment searchVideoGridFragment;
+	private ChannelBrowserFragment channelBrowserFragment;
 
 	/** Set to true of the UpdatesCheckerTask has run; false otherwise. */
 	private static boolean updatesCheckerTaskRan = false;
-
+	public static final String ACTION_VIEW_CHANNEL = "MainActivity.ViewChannel";
 	private static final String MAIN_FRAGMENT   = "MainActivity.MainFragment";
 	private static final String SEARCH_FRAGMENT = "MainActivity.SearchFragment";
+	public static final String CHANNEL_BROWSER_FRAGMENT = "MainActivity.ChannelBrowserFragment";
+
+	private boolean dontAddToBackStack = false;
 
 
 	@Override
@@ -80,11 +84,21 @@ public class MainActivity extends AppCompatActivity implements MainActivityListe
 			if(savedInstanceState != null) {
 				mainFragment = (MainFragment)getSupportFragmentManager().getFragment(savedInstanceState, MAIN_FRAGMENT);
 				searchVideoGridFragment = (SearchVideoGridFragment) getSupportFragmentManager().getFragment(savedInstanceState, SEARCH_FRAGMENT);
+				channelBrowserFragment = (ChannelBrowserFragment) getSupportFragmentManager().getFragment(savedInstanceState, CHANNEL_BROWSER_FRAGMENT);
 			}
 
-			if(mainFragment == null) {
-				mainFragment = new MainFragment();
-				getSupportFragmentManager().beginTransaction().add(R.id.fragment_container, mainFragment).commit();
+			// If this Activity was called to view a particular channel, display that channel via ChannelBrowserFragment, instead of MainFragment
+			String action = getIntent().getAction();
+			if(action != null && action.equals(ACTION_VIEW_CHANNEL)) {
+				//
+				dontAddToBackStack = true;
+				YouTubeChannel channel = (YouTubeChannel) getIntent().getSerializableExtra(ChannelBrowserFragment.CHANNEL_OBJ);
+				onChannelClick(channel);
+			} else {
+				if(mainFragment == null) {
+					mainFragment = new MainFragment();
+					getSupportFragmentManager().beginTransaction().add(R.id.fragment_container, mainFragment).commit();
+				}
 			}
 		}
 	}
@@ -96,6 +110,8 @@ public class MainActivity extends AppCompatActivity implements MainActivityListe
 			getSupportFragmentManager().putFragment(outState, MAIN_FRAGMENT, mainFragment);
 		if(searchVideoGridFragment != null && searchVideoGridFragment.isVisible())
 			getSupportFragmentManager().putFragment(outState, SEARCH_FRAGMENT, searchVideoGridFragment);
+		if(channelBrowserFragment != null && channelBrowserFragment.isVisible())
+			getSupportFragmentManager().putFragment(outState, CHANNEL_BROWSER_FRAGMENT, channelBrowserFragment);
 		super.onSaveInstanceState(outState);
 	}
 
@@ -156,6 +172,10 @@ public class MainActivity extends AppCompatActivity implements MainActivityListe
 		return super.onOptionsItemSelected(item);
 	}
 
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+	}
 
 	/**
 	 * Display the Enter Video URL dialog.
@@ -231,7 +251,10 @@ public class MainActivity extends AppCompatActivity implements MainActivityListe
 		FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
 
 		transaction.replace(R.id.fragment_container, fragment);
-		transaction.addToBackStack(null);
+		if(!dontAddToBackStack)
+			transaction.addToBackStack(null);
+		else
+			dontAddToBackStack = false;
 		transaction.commit();
 	}
 
@@ -239,20 +262,22 @@ public class MainActivity extends AppCompatActivity implements MainActivityListe
 
 	@Override
 	public void onChannelClick(YouTubeChannel channel) {
-		Intent i = new Intent(MainActivity.this, FragmentHolderActivity.class);
-		i.putExtra(FragmentHolderActivity.FRAGMENT_HOLDER_CHANNEL_BROWSER, true);
-		i.putExtra(ChannelBrowserFragment.CHANNEL_OBJ, channel);
-		startActivity(i);
+		Bundle args = new Bundle();
+		args.putSerializable(ChannelBrowserFragment.CHANNEL_OBJ, channel);
+		switchToChannelBrowserFragment(args);
 	}
-
-
 
 	@Override
 	public void onChannelClick(String channelId) {
-		Intent i = new Intent(MainActivity.this, FragmentHolderActivity.class);
-		i.putExtra(FragmentHolderActivity.FRAGMENT_HOLDER_CHANNEL_BROWSER, true);
-		i.putExtra(ChannelBrowserFragment.CHANNEL_ID, channelId);
-		startActivity(i);
+		Bundle args = new Bundle();
+		args.putString(ChannelBrowserFragment.CHANNEL_ID, channelId);
+		switchToChannelBrowserFragment(args);
+	}
+
+	private void switchToChannelBrowserFragment(Bundle args) {
+		channelBrowserFragment = new ChannelBrowserFragment();
+		channelBrowserFragment.setArguments(args);
+		switchToFragment(channelBrowserFragment);
 	}
 
 }

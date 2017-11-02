@@ -19,6 +19,7 @@ package free.rm.skytube.businessobjects.db;
 
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
@@ -34,9 +35,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.YouTubeChannel;
 import free.rm.skytube.businessobjects.YouTubeVideo;
-import free.rm.skytube.app.SkyTubeApp;
 
 /**
  * A database (DB) that stores user subscriptions (with respect to YouTube channels).
@@ -95,6 +96,7 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 		values.put(SubscriptionsTable.COL_LAST_VISIT_TIME, System.currentTimeMillis());
 
 		saveChannelVideos(channel);
+
 		return getWritableDatabase().insert(SubscriptionsTable.TABLE_NAME, null, values) != -1;
 	}
 

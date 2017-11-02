@@ -18,22 +18,17 @@
 package free.rm.skytube.businessobjects;
 
 import android.content.SharedPreferences;
-import android.widget.Toast;
 
 import com.google.api.client.util.DateTime;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 
-import free.rm.skytube.R;
-import free.rm.skytube.businessobjects.db.SubscriptionsDb;
 import free.rm.skytube.app.SkyTubeApp;
+import free.rm.skytube.businessobjects.db.SubscriptionsDb;
 import free.rm.skytube.gui.businessobjects.SubscriptionsFragmentListener;
-
-import static free.rm.skytube.app.SkyTubeApp.getContext;
 
 /**
  * A task that returns the videos of channel the user has subscribed too.  Used to detect if new
@@ -44,18 +39,103 @@ public class GetSubscriptionVideosTask extends AsyncTaskParallel<Void, Void, Voi
 	private SubscriptionsFragmentListener listener;
 	private int numTasksLeft = 0;
 	private int numTasksFinished = 0;
-
+	boolean foundVideos = false;
+	boolean forceRefresh = false;
+	private List<YouTubeChannel> overriddenChannels;
 
 	public GetSubscriptionVideosTask(SubscriptionsFragmentListener listener) {
 		this.listener = listener;
 	}
 
+	public GetSubscriptionVideosTask setForceRefresh(boolean forceRefresh) {
+		this.forceRefresh = forceRefresh;
+		return this;
+	}
+
+	public GetSubscriptionVideosTask setChannelsToRefresh(List<YouTubeChannel> channels) {
+		overriddenChannels = channels;
+		return this;
+	}
+
+
+	/**
+	 * @return The last time we updated the subscriptions videos feed.  Will return null if the
+	 * last refresh time is set to -1.
+	 */
+	private DateTime getFeedsLastUpdateTime() {
+		long l = SkyTubeApp.getPreferenceManager().getLong(SkyTubeApp.KEY_SUBSCRIPTIONS_LAST_UPDATED, -1);
+		return (l != -1)  ?  new DateTime(l)  :  null;
+	}
+
+
+	/**
+	 * Update the feeds' last update time to the current time.
+	 */
+	private void updateFeedsLastUpdateTime() {
+		updateFeedsLastUpdateTime(new DateTime(new Date()));
+	}
+
+
+	/**
+	 * Update the feed's last update time to dateTime.
+	 *
+	 * @param dateTime  The feed's last update time.  If it is set to null, then -1 will be stored
+	 *                  to indicate that the app needs to force refresh the feeds...
+	 */
+	public static void updateFeedsLastUpdateTime(DateTime dateTime) {
+		SharedPreferences.Editor editor = SkyTubeApp.getPreferenceManager().edit();
+		editor.putLong(SkyTubeApp.KEY_SUBSCRIPTIONS_LAST_UPDATED, dateTime != null  ?  dateTime.getValue()  :  -1);
+		editor.commit();
+	}
+
+
 	@Override
 	protected Void doInBackground(Void... voids) {
 		try {
-			List<YouTubeChannel> channels = SubscriptionsDb.getSubscriptionsDb().getSubscribedChannels(false);
-			for(YouTubeChannel channel : channels) {
-				tasks.add(new GetChannelVideosTask(channel));
+			List<YouTubeChannel> channels = overriddenChannels != null ? overriddenChannels : SubscriptionsDb.getSubscriptionsDb().getSubscribedChannels(false);
+
+			/**
+			 * Get the last time all subscriptions were updated, and only fetch videos that were published after this.
+			 * Any new channels that have been subscribed to since the last time this refresh was done will have any
+			 * videos published after the last published time stored in the database, so we don't need to worry about missing
+			 * any.
+			 */
+
+			// If forceRefresh is set to true, then set publishedAfter to null... this will force
+			// the app to update the feeds.  Otherwise, set the publishedAfter date to the last
+			// time we updated the feeds.
+			DateTime publishedAfter = forceRefresh ? null : getFeedsLastUpdateTime();
+
+			for(final YouTubeChannel channel : channels) {
+				tasks.add(new GetChannelVideosTask(channel)
+					.setPublishedAfter(publishedAfter)
+					.setGetChannelVideosTaskInterface(new GetChannelVideosTaskInterface() {
+						@Override
+						public void onGetVideos(List<YouTubeVideo> videos) {
+							numTasksFinished++;
+							boolean videosDeleted = false;
+							if(numTasksFinished < numTasksLeft) {
+								if(tasks.size() > 0) {
+									// More channels to fetch videos from
+									tasks.get(0).executeInParallel();
+									tasks.remove(0);
+								}
+								if(listener != null)
+									listener.onChannelVideosFetched(channel, videos != null ? videos.size() : 0, videosDeleted);
+							} else {
+								videosDeleted = SubscriptionsDb.getSubscriptionsDb().trimSubscriptionVideos();
+
+								// All channels have finished querying. Update the last time this refresh was done.
+								updateFeedsLastUpdateTime();
+
+								if(listener != null)
+									listener.onChannelVideosFetched(channel, videos != null ? videos.size() : 0, videosDeleted);
+								if(listener != null)
+									listener.onAllChannelVideosFetched();
+							}
+						}
+					})
+				);
 			}
 
 			numTasksLeft = tasks.size();
@@ -72,91 +152,4 @@ public class GetSubscriptionVideosTask extends AsyncTaskParallel<Void, Void, Voi
 		}
 		return null;
 	}
-
-
-
-	private class GetChannelVideosTask extends AsyncTaskParallel<Void, Void, List<YouTubeVideo>> {
-
-		private GetChannelVideos getChannelVideos = new GetChannelVideos();
-		private YouTubeChannel channel;
-
-
-		public GetChannelVideosTask(YouTubeChannel channel) {
-			try {
-				getChannelVideos.init();
-
-				/**
-				 * Get the last time all subscriptions were updated, and only fetch videos that were published after this.
-				 * Any new channels that have been subscribed to since the last time this refresh was done will have any
-				 * videos published after the last published time stored in the database, so we don't need to worry about missing
-				 * any.
- 				 */
-				long l = SkyTubeApp.getPreferenceManager().getLong(SkyTubeApp.KEY_SUBSCRIPTIONS_LAST_UPDATED, -1);
-				if(l != -1) {
-					DateTime subscriptionsLastUpdated = new DateTime(l);
-					if (subscriptionsLastUpdated != null)
-						getChannelVideos.setPublishedAfter(subscriptionsLastUpdated);
-					else // For the first fetch, default to only videos published in the last month.
-						getChannelVideos.setPublishedAfter(getOneMonthAgo());
-				}
-
-				getChannelVideos.setQuery(channel.getId());
-				this.channel = channel;
-			} catch (IOException e) {
-				e.printStackTrace();
-				Toast.makeText(getContext(),
-								String.format(getContext().getString(R.string.could_not_get_videos), channel.getTitle()),
-								Toast.LENGTH_LONG).show();
-			}
-		}
-
-
-		@Override
-		protected List<YouTubeVideo> doInBackground(Void... voids) {
-			List<YouTubeVideo> videos = null;
-
-			if (!isCancelled()) {
-				videos = getChannelVideos.getNextVideos();
-			}
-
-			if(videos != null) {
-				for (YouTubeVideo video : videos)
-					channel.addYouTubeVideo(video);
-				SubscriptionsDb.getSubscriptionsDb().saveChannelVideos(channel);
-			}
-			return videos;
-		}
-
-
-		@Override
-		protected void onPostExecute(List<YouTubeVideo> youTubeVideos) {
-			numTasksFinished++;
-			boolean videosDeleted = false;
-			if(numTasksFinished < numTasksLeft) {
-				if(tasks.size() > 0) {
-					// More channels to fetch videos from
-					tasks.get(0).executeInParallel();
-					tasks.remove(0);
-				}
-			} else {
-				videosDeleted = SubscriptionsDb.getSubscriptionsDb().trimSubscriptionVideos();
-				// All channels have finished querying. Update the last time this refresh was done.
-				SharedPreferences.Editor editor = SkyTubeApp.getPreferenceManager().edit();
-				editor.putLong(SkyTubeApp.KEY_SUBSCRIPTIONS_LAST_UPDATED, new DateTime(new Date()).getValue());
-				editor.commit();
-			}
-			if(listener != null)
-				listener.onChannelVideosFetched(channel, youTubeVideos != null ? youTubeVideos.size() : 0, videosDeleted);
-		}
-
-
-		private DateTime getOneMonthAgo() {
-			Calendar calendar = Calendar.getInstance();
-			calendar.add(Calendar.MONTH, -1);
-			Date date = calendar.getTime();
-			return new DateTime(date);
-		}
-
-	}
-
 }

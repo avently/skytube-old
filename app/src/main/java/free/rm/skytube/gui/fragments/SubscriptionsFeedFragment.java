@@ -17,8 +17,11 @@
 
 package free.rm.skytube.gui.fragments;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 import android.view.View;
@@ -28,38 +31,45 @@ import com.afollestad.materialdialogs.MaterialDialog;
 
 import java.util.List;
 
-import butterknife.Bind;
+import butterknife.BindView;
+import butterknife.OnClick;
 import free.rm.skytube.R;
+import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.AsyncTaskParallel;
 import free.rm.skytube.businessobjects.GetSubscriptionVideosTask;
+import free.rm.skytube.gui.businessobjects.MainActivityListener;
 import free.rm.skytube.businessobjects.VideoCategory;
 import free.rm.skytube.businessobjects.YouTubeChannel;
 import free.rm.skytube.businessobjects.YouTubeVideo;
 import free.rm.skytube.businessobjects.db.SubscriptionsDb;
-import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.gui.businessobjects.SubsAdapter;
+import free.rm.skytube.gui.businessobjects.SubscriptionsBackupsManager;
 import free.rm.skytube.gui.businessobjects.SubscriptionsFragmentListener;
 
 /**
  * Fragment that displays subscriptions videos feed from all channels the user is subscribed to.
  */
 public class SubscriptionsFeedFragment extends VideosGridFragment implements SubscriptionsFragmentListener {
-
 	private int numVideosFetched = 0;
 	private int numChannelsFetched = 0;
 	private int numChannelsSubscribed = 0;
 	private boolean refreshInProgress = false;
 	private MaterialDialog progressDialog;
 	private boolean shouldRefresh = false;
+	private SubscriptionsBackupsManager subscriptionsBackupsManager;
 
-	@Bind(R.id.noSubscriptionsText)
+	@BindView(R.id.noSubscriptionsText)
 	View noSubscriptionsText;
+
+	private static final String KEY_SET_UPDATE_FEED_TAB = "SubscriptionsFeedFragment.KEY_SET_UPDATE_FEED_TAB";
+
 
 	@Override
 	public void onCreate(@Nullable Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		shouldRefresh = true;
 		setLayoutResource(R.layout.videos_gridview_feed);
+		subscriptionsBackupsManager = new SubscriptionsBackupsManager(getActivity(), SubscriptionsFeedFragment.this);
 	}
 
 	@Override
@@ -67,6 +77,35 @@ public class SubscriptionsFeedFragment extends VideosGridFragment implements Sub
 		super.onViewCreated(view, savedInstanceState);
 
 		new GetTotalNumberOfChannelsTask().executeInParallel();
+	}
+
+	@Override
+	public void onResume() {
+		Log.d("SubsFeed", "On RESUME...");
+
+		super.onResume();
+		// this will detect whether we have previous instructed the app (via refreshSubscriptionsFeed())
+		// to refresh the subs feed
+		if (SkyTubeApp.getPreferenceManager().getBoolean(KEY_SET_UPDATE_FEED_TAB, false)) {
+			// unset the flag
+			SharedPreferences.Editor editor = SkyTubeApp.getPreferenceManager().edit();
+			editor.putBoolean(KEY_SET_UPDATE_FEED_TAB, false);
+			editor.commit();
+
+			// refresh the subs feed
+			new SetVideosListTask().executeInParallel();
+		}
+	}
+
+	/**
+	 * Instruct the {@link SubscriptionsFeedFragment} to refresh the subscriptions feed.  This might
+	 * occur due to user subscribing/unsubscribing to a channel or a user just imported the subbed
+	 * channels from YouTube (XML file).
+	 */
+	public static void refreshSubscriptionsFeed() {
+		SharedPreferences.Editor editor = SkyTubeApp.getPreferenceManager().edit();
+		editor.putBoolean(KEY_SET_UPDATE_FEED_TAB, true);
+		editor.commit();
 	}
 
 
@@ -122,7 +161,7 @@ public class SubscriptionsFeedFragment extends VideosGridFragment implements Sub
 						// Only show the toast that no videos were found if the progress dialog is sh
 						if(fragmentIsVisible) {
 							Toast.makeText(getContext(),
-											String.format(getContext().getString(R.string.no_new_videos_found)),
+											R.string.no_new_videos_found,
 											Toast.LENGTH_LONG).show();
 						}
 					}
@@ -131,6 +170,9 @@ public class SubscriptionsFeedFragment extends VideosGridFragment implements Sub
 		}
 	}
 
+	@Override
+	public void onAllChannelVideosFetched() {
+	}
 
 	@Override
 	public void onFragmentSelected() {
@@ -151,6 +193,24 @@ public class SubscriptionsFeedFragment extends VideosGridFragment implements Sub
 	@Override
 	protected String getFragmentName() {
 		return SkyTubeApp.getStr(R.string.feed);
+	}
+
+
+	@OnClick(R.id.importSubscriptionsButton)
+	public void importSubscriptions(View v) {
+		subscriptionsBackupsManager.displayImportSubscriptionsDialog();
+	}
+
+
+	@OnClick(R.id.importBackupButton)
+	public void importBackup(View v) {
+		subscriptionsBackupsManager.displayFilePicker();
+	}
+
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+		subscriptionsBackupsManager.onRequestPermissionsResult(requestCode, permissions, grantResults);
 	}
 
 
@@ -194,6 +254,7 @@ public class SubscriptionsFeedFragment extends VideosGridFragment implements Sub
 	}
 
 
+
 	/**
 	 * A task that refreshes the videos of the {@link SubscriptionsFeedFragment}.
 	 */
@@ -202,7 +263,7 @@ public class SubscriptionsFeedFragment extends VideosGridFragment implements Sub
 		private boolean showDialog;
 
 
-		public RefreshTask(boolean showDialog) {
+		private RefreshTask(boolean showDialog) {
 			this.showDialog = showDialog;
 		}
 
@@ -242,6 +303,15 @@ public class SubscriptionsFeedFragment extends VideosGridFragment implements Sub
 		@Override
 		protected void onPostExecute(List<YouTubeVideo> youTubeVideos) {
 			videoGridAdapter.setList(youTubeVideos);
+			if(youTubeVideos.size() == 0) {
+				swipeRefreshLayout.setVisibility(View.GONE);
+				noSubscriptionsText.setVisibility(View.VISIBLE);
+			} else {
+				if(swipeRefreshLayout.getVisibility() != View.VISIBLE) {
+					swipeRefreshLayout.setVisibility(View.VISIBLE);
+					noSubscriptionsText.setVisibility(View.GONE);
+				}
+			}
 		}
 
 	}

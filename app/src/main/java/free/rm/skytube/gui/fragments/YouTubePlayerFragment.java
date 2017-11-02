@@ -29,22 +29,24 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.List;
+import java.util.Locale;
 
 import free.rm.skytube.R;
+import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.AsyncTaskParallel;
 import free.rm.skytube.businessobjects.GetVideoDescription;
 import free.rm.skytube.businessobjects.GetVideosDetailsByIDs;
-import free.rm.skytube.gui.businessobjects.IsVideoBookmarkedTask;
+import free.rm.skytube.businessobjects.GetYouTubeChannelInfoTask;
 import free.rm.skytube.businessobjects.VideoStream.StreamMetaData;
 import free.rm.skytube.businessobjects.VideoStream.StreamMetaDataList;
 import free.rm.skytube.businessobjects.YouTubeChannel;
+import free.rm.skytube.businessobjects.YouTubeChannelInterface;
 import free.rm.skytube.businessobjects.YouTubeVideo;
 import free.rm.skytube.businessobjects.db.CheckIfUserSubbedToChannelTask;
-import free.rm.skytube.businessobjects.db.SubscribeToChannelTask;
-import free.rm.skytube.gui.activities.FragmentHolderActivity;
-import free.rm.skytube.app.SkyTubeApp;
+import free.rm.skytube.gui.activities.MainActivity;
 import free.rm.skytube.gui.businessobjects.CommentsAdapter;
 import free.rm.skytube.gui.businessobjects.FragmentEx;
+import free.rm.skytube.gui.businessobjects.IsVideoBookmarkedTask;
 import free.rm.skytube.gui.businessobjects.MediaControllerEx;
 import free.rm.skytube.gui.businessobjects.SubscribeButton;
 import free.rm.skytube.player.BackgroundPlayer;
@@ -121,7 +123,20 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 		if (youTubeVideo == null) {
 			loadingVideoView = view.findViewById(R.id.loadingVideoView);
 
-			videoView = (VideoView) view.findViewById(R.id.video_view);
+			videoView = view.findViewById(R.id.video_view);
+			// videoView should log any errors
+			videoView.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+				@Override
+				public boolean onError(MediaPlayer mp, int what, int extra) {
+					String msg = String.format(Locale.getDefault(),
+							"Error has occurred while playing video, url='%s', what=%d, extra=%d",
+							youTubeVideo != null ? youTubeVideo.getVideoUrl() : "null",
+							what,
+							extra);
+					Log.e(TAG, msg);
+					return false;
+				}
+			});
 			// play the video once its loaded
 			videoView.setOnPreparedListener(this);
 
@@ -139,42 +154,35 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 				}
 			});
 
-			videoDescriptionDrawer = (SlidingDrawer) view.findViewById(R.id.des_drawer);
-			videoDescTitleTextView = (TextView) view.findViewById(R.id.video_desc_title);
-			videoDescChannelThumbnailImageView = (ImageView) view.findViewById(R.id.video_desc_channel_thumbnail_image_view);
+			videoDescriptionDrawer = view.findViewById(R.id.des_drawer);
+			videoDescTitleTextView = view.findViewById(R.id.video_desc_title);
+			videoDescChannelThumbnailImageView = view.findViewById(R.id.video_desc_channel_thumbnail_image_view);
 			videoDescChannelThumbnailImageView.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
 					if (youTubeChannel != null) {
 						videoView.pause();
-						Intent i = new Intent(getActivity(), FragmentHolderActivity.class);
-						i.putExtra(FragmentHolderActivity.FRAGMENT_HOLDER_CHANNEL_BROWSER, true);
+						Intent i = new Intent(getActivity(), MainActivity.class);
+						i.setAction(MainActivity.ACTION_VIEW_CHANNEL);
 						i.putExtra(ChannelBrowserFragment.CHANNEL_OBJ, youTubeChannel);
 						startActivity(i);
 					}
 				}
 			});
-			videoDescChannelTextView = (TextView) view.findViewById(R.id.video_desc_channel);
-			videoDescViewsTextView = (TextView) view.findViewById(R.id.video_desc_views);
-			videoDescLikesTextView = (TextView) view.findViewById(R.id.video_desc_likes);
-			videoDescDislikesTextView = (TextView) view.findViewById(R.id.video_desc_dislikes);
+			videoDescChannelTextView = view.findViewById(R.id.video_desc_channel);
+			videoDescViewsTextView = view.findViewById(R.id.video_desc_views);
+			videoDescLikesTextView = view.findViewById(R.id.video_desc_likes);
+			videoDescDislikesTextView = view.findViewById(R.id.video_desc_dislikes);
 			videoDescRatingsDisabledTextView = view.findViewById(R.id.video_desc_ratings_disabled);
-			videoDescPublishDateTextView = (TextView) view.findViewById(R.id.video_desc_publish_date);
-			videoDescriptionTextView = (TextView) view.findViewById(R.id.video_desc_description);
-			videoDescLikesBar = (ProgressBar) view.findViewById(R.id.video_desc_likes_bar);
-			videoDescSubscribeButton = (SubscribeButton) view.findViewById(R.id.video_desc_subscribe_button);
-			videoDescSubscribeButton.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					// subscribe / unsubscribe to this video's channel
-					new SubscribeToChannelTask(videoDescSubscribeButton, youTubeChannel).execute();
-				}
-			});
+			videoDescPublishDateTextView = view.findViewById(R.id.video_desc_publish_date);
+			videoDescriptionTextView = view.findViewById(R.id.video_desc_description);
+			videoDescLikesBar = view.findViewById(R.id.video_desc_likes_bar);
+			videoDescSubscribeButton = view.findViewById(R.id.video_desc_subscribe_button);
 
-			commentsExpandableListView = (ExpandableListView) view.findViewById(R.id.commentsExpandableListView);
+			commentsExpandableListView = view.findViewById(R.id.commentsExpandableListView);
 			commentsProgressBar = view.findViewById(R.id.comments_progress_bar);
 			noVideoCommentsView = view.findViewById(R.id.no_video_comments_text_view);
-			commentsDrawer = (SlidingDrawer) view.findViewById(R.id.comments_drawer);
+			commentsDrawer = view.findViewById(R.id.comments_drawer);
 			commentsDrawer.setOnDrawerOpenListener(new OnDrawerOpenListener() {
 				@Override
 				public void onDrawerOpened() {
@@ -254,7 +262,20 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 	 */
 	private void getVideoInfoTasks() {
 		// get Channel info (e.g. avatar...etc) task
-		new GetYouTubeChannelInfoTask().executeInParallel(youTubeVideo.getChannelId());
+		new GetYouTubeChannelInfoTask(new YouTubeChannelInterface() {
+			@Override
+			public void onGetYouTubeChannel(YouTubeChannel youTubeChannel) {
+				YouTubePlayerFragment.this.youTubeChannel = youTubeChannel;
+
+				videoDescSubscribeButton.setChannel(YouTubePlayerFragment.this.youTubeChannel);
+				if (youTubeChannel != null) {
+					Glide.with(getActivity())
+									.load(youTubeChannel.getThumbnailNormalUrl())
+									.placeholder(R.drawable.channel_thumbnail_default)
+									.into(videoDescChannelThumbnailImageView);
+				}
+			}
+		}).executeInParallel(youTubeVideo.getChannelId());
 
 		// check if the user has subscribed to a channel... if he has, then change the state of
 		// the subscribe button
@@ -849,43 +870,6 @@ public class YouTubePlayerFragment extends FragmentEx implements MediaPlayer.OnP
 		}
 
 	}
-
-
-	////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-	private class GetYouTubeChannelInfoTask extends AsyncTaskParallel<String, Void, YouTubeChannel> {
-
-		private final String TAG = GetYouTubeChannelInfoTask.class.getSimpleName();
-
-		@Override
-		protected YouTubeChannel doInBackground(String... channelId) {
-			YouTubeChannel chn = new YouTubeChannel();
-
-			try {
-				chn.init(channelId[0]);
-			} catch (IOException e) {
-				Log.e(TAG, "Unable to get channel info.  ChannelID=" + channelId[0], e);
-				chn = null;
-			}
-
-			return chn;
-		}
-
-		@Override
-		protected void onPostExecute(YouTubeChannel youTubeChannel) {
-			YouTubePlayerFragment.this.youTubeChannel = youTubeChannel;
-
-			if (youTubeChannel != null) {
-				Glide.with(getActivity())
-						.load(youTubeChannel.getThumbnailNormalUrl())
-						.placeholder(R.drawable.channel_thumbnail_default)
-						.into(videoDescChannelThumbnailImageView);
-			}
-		}
-
-	}
-
 
 
 	////////////////////////////////////////////////////////////////////////////////////////////////

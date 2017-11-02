@@ -18,7 +18,6 @@
 package free.rm.skytube.gui.fragments;
 
 import android.os.Bundle;
-import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -32,7 +31,7 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import free.rm.skytube.R;
-import free.rm.skytube.businessobjects.MainActivityListener;
+import free.rm.skytube.gui.businessobjects.MainActivityListener;
 import free.rm.skytube.businessobjects.VideoCategory;
 import free.rm.skytube.gui.businessobjects.LoadingProgressBar;
 import free.rm.skytube.gui.businessobjects.VideoGridAdapter;
@@ -55,11 +54,11 @@ public class SearchVideoGridFragment extends BaseVideosGridFragment {
 		View view = inflater.inflate(R.layout.videos_searchview, container, false);
 
 		// setup the toolbar/actionbar
-		Toolbar toolbar = (Toolbar) view.findViewById(R.id.toolbar);
+		Toolbar toolbar = view.findViewById(R.id.toolbar);
 		setSupportActionBar(toolbar);
 		getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
-		this.gridView = (RecyclerView) view.findViewById(R.id.grid_view);
+		this.gridView = view.findViewById(R.id.grid_view);
 
 		// set up the loading progress bar
 		LoadingProgressBar.get().setProgressBar(view.findViewById(R.id.loading_progress_bar));
@@ -97,11 +96,11 @@ public class SearchVideoGridFragment extends BaseVideosGridFragment {
 
 	@Override
 	public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-		final MenuItem   searchItem = menu.findItem(R.id.menu_search);
-		final SearchView searchView = (SearchView) MenuItemCompat.getActionView(searchItem);
+		final MenuItem   searchMenuItem = menu.findItem(R.id.menu_search);
+		final SearchView searchView = (SearchView) searchMenuItem.getActionView();
 
 		// will be called when the user clicks on the actionbar's search icon
-		MenuItemCompat.setOnActionExpandListener(searchItem, new MenuItemCompat.OnActionExpandListener() {
+		searchMenuItem.setOnActionExpandListener(new MenuItem.OnActionExpandListener() {
 			@Override
 			public boolean onMenuItemActionExpand(MenuItem item) {
 				// if the user has previously search, then copy the query into the search view

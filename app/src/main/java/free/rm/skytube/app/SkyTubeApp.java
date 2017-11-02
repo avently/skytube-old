@@ -39,6 +39,7 @@ public class SkyTubeApp extends MultiDexApplication {
 
 	public static final String KEY_SUBSCRIPTIONS_LAST_UPDATED = "SkyTubeApp.KEY_SUBSCRIPTIONS_LAST_UPDATED";
 
+
 	@Override
 	public void onCreate() {
 		super.onCreate();

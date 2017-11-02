@@ -17,19 +17,20 @@
 
 package free.rm.skytube.businessobjects.db;
 
-import android.os.AsyncTask;
 import android.widget.Toast;
 
 import free.rm.skytube.R;
-import free.rm.skytube.businessobjects.YouTubeChannel;
 import free.rm.skytube.app.SkyTubeApp;
+import free.rm.skytube.businessobjects.AsyncTaskParallel;
+import free.rm.skytube.businessobjects.YouTubeChannel;
 import free.rm.skytube.gui.businessobjects.SubsAdapter;
 import free.rm.skytube.gui.businessobjects.SubscribeButton;
+import free.rm.skytube.gui.fragments.SubscriptionsFeedFragment;
 
 /**
  * A task that subscribes / unsubscribes to a YouTube channel.
  */
-public class SubscribeToChannelTask extends AsyncTask<Void, Void, Boolean> {
+public class SubscribeToChannelTask extends AsyncTaskParallel<Void, Void, Boolean> {
 
 	/** Set to true if the user wants to subscribe to a youtube channel;  false if the user wants to
 	 *  unsubscribe. */
@@ -67,6 +68,10 @@ public class SubscribeToChannelTask extends AsyncTask<Void, Void, Boolean> {
 	protected void onPostExecute(Boolean success) {
 		if (success) {
 			SubsAdapter adapter = SubsAdapter.get(subscribeButton.getContext());
+
+			// we need to refresh the Feed tab so it shows videos from the newly subscribed (or
+			// unsubscribed) channels
+			SubscriptionsFeedFragment.refreshSubscriptionsFeed();
 
 			if (subscribeToChannel) {
 				// change the state of the button
