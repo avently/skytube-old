@@ -21,9 +21,9 @@ import com.bumptech.glide.Glide;
 
 import free.rm.skytube.util.ControllerOverlay;
 import free.rm.skytube.util.GestureControllerOverlay;
-import org.schabi.newpipe.extractor.stream_info.AudioStream;
-import org.schabi.newpipe.extractor.stream_info.StreamInfo;
-import org.schabi.newpipe.extractor.stream_info.VideoStream;
+import org.schabi.newpipe.extractor.stream.AudioStream;
+import org.schabi.newpipe.extractor.stream.StreamInfo;
+import org.schabi.newpipe.extractor.stream.VideoStream;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;

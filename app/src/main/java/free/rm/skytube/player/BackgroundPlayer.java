@@ -22,7 +22,7 @@ import android.widget.RemoteViews;
 import free.rm.skytube.BuildConfig;
 import free.rm.skytube.R;
 import org.schabi.newpipe.extractor.MediaFormat;
-import org.schabi.newpipe.extractor.stream_info.AudioStream;
+import org.schabi.newpipe.extractor.stream.AudioStream;
 
 import free.rm.skytube.gui.activities.YouTubePlayerActivity;
 

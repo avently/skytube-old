@@ -29,7 +29,7 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.youtube.model.Thumbnail;
 import com.google.api.services.youtube.model.Video;
 
-import org.schabi.newpipe.extractor.stream_info.StreamInfo;
+import org.schabi.newpipe.extractor.stream.StreamInfo;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
